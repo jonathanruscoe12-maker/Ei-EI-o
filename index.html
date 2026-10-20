@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Kitchen Remote</title>
+<style>
+  /* ---------- Colours & sizes (edit these to restyle) ---------- */
+  :root {
+    --bg: #14110f;
+    --panel: #1f1b18;
+    --panel-2: #2a2521;
+    --text: #f4efe9;
+    --muted: #a99f95;
+    --accent: #1ed760;       /* Spotify green */
+    --accent-ink: #0b1f12;
+    --danger: #ff6b5b;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  button {
+    font: inherit; color: inherit; border: 0; cursor: pointer;
+    background: var(--panel-2); border-radius: var(--radius);
+  }
+  button:active { transform: scale(0.96); }
+  .hidden { display: none !important; }
+
+  /* ---------- Layout ---------- */
+  #app { display: flex; flex-direction: column; height: 100%; padding: 16px; gap: 14px; }
+  header { display: flex; align-items: center; gap: 12px; }
+  #clock { font-size: 34px; font-weight: 600; letter-spacing: 0.5px; }
+  #date { color: var(--muted); font-size: 16px; }
+  .spacer { flex: 1; }
+  #deviceBtn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px; font-size: 18px; background: var(--panel);
+  }
+  #deviceBtn .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); }
+  #deviceBtn.ok .dot { background: var(--accent); }
+
+  main { flex: 1; display: flex; gap: 16px; min-height: 0; }
+
+  /* Now playing */
+  #now {
+    flex: 0 0 46%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 12px; background: var(--panel);
+    border-radius: var(--radius); padding: 18px; min-width: 0;
+  }
+  #art {
+    width: 38vh; height: 38vh; max-width: 100%; border-radius: 14px;
+    background: var(--panel-2) center/cover no-repeat;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #track { font-size: 24px; font-weight: 600; text-align: center; max-width: 100%;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #artist { font-size: 18px; color: var(--muted); text-align: center; max-width: 100%;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -6px; }
+  #progress { width: 100%; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  #progressBar { height: 100%; width: 0; background: var(--accent); transition: width 1s linear; }
+
+  .controls { display: flex; align-items: center; gap: 14px; }
+  .controls button { width: 72px; height: 72px; display: grid; place-items: center; }
+  .controls button svg { width: 34px; height: 34px; fill: var(--text); }
+  #playBtn { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); }
+  #playBtn svg { fill: var(--accent-ink); width: 42px; height: 42px; }
+  #shuffleBtn.on svg { fill: var(--accent); }
+
+  .volume { display: flex; align-items: center; gap: 14px; }
+  .volume button { width: 64px; height: 56px; font-size: 30px; font-weight: 600; }
+  #volLabel { min-width: 70px; text-align: center; font-size: 20px; color: var(--muted); }
+
+  /* Playlists */
+  #lists { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #lists h2 { margin: 2px 4px 10px; font-size: 20px; font-weight: 600; color: var(--muted); }
+  #grid {
+    flex: 1; overflow-y: auto; display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-content: start;
+    padding-right: 4px;
+  }
+  .pl { background: var(--panel); padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+  .pl .img { width: 100%; padding-top: 100%; border-radius: 10px; background: var(--panel-2) center/cover no-repeat; }
+  .pl .name { font-size: 15px; line-height: 1.25; height: 2.5em; overflow: hidden; }
+
+  /* Login / setup screen */
+  #setup {
+    position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center;
+    justify-content: center; padding: 24px;
+  }
+  .card { background: var(--panel); border-radius: var(--radius); padding: 28px; max-width: 640px; width: 100%; }
+  .card h1 { margin: 0 0 10px; font-size: 28px; }
+  .card p { color: var(--muted); font-size: 16px; line-height: 1.5; }
+  .card code { background: var(--panel-2); padding: 3px 7px; border-radius: 6px; color: var(--text); word-break: break-all; }
+  .card input {
+    width: 100%; font-size: 18px; padding: 14px; border-radius: 12px; border: 1px solid #3a342f;
+    background: var(--bg); color: var(--text); margin: 6px 0 14px;
+  }
+  .big { background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 20px; padding: 16px 26px; }
+
+  /* Device picker sheet */
+  #sheet { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
+  #sheet .card { max-height: 85vh; overflow-y: auto; }
+  .dev { width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px; margin-bottom: 10px; font-size: 19px; text-align: left; }
+  .dev small { color: var(--muted); font-size: 14px; }
+  .dev.active { outline: 2px solid var(--accent); }
+  .dev .star { margin-left: auto; color: var(--accent); font-size: 14px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: var(--panel-2); padding: 12px 20px; border-radius: 12px; font-size: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5); max-width: 90%;
+  }
+  #toast.err { background: #4a1f1a; color: #ffd9d4; }
+</style>
+</head>
+<body>
+
+<!-- ================= MAIN REMOTE ================= -->
+<div id="app" class="hidden">
+  <header>
+    <div>
+      <div id="clock">--:--</div>
+      <div id="date"></div>
+    </div>
+    <div class="spacer"></div>
+    <button id="deviceBtn"><span class="dot"></span><span id="deviceName">No speaker</span></button>
+  </header>
+
+  <main>
+    <section id="now">
+      <div id="art"></div>
+      <div id="track">Nothing playing</div>
+      <div id="artist">Pick a playlist to start</div>
+      <div id="progress"><div id="progressBar"></div></div>
+      <div class="controls">
+        <button id="shuffleBtn" title="Shuffle"><svg viewBox="0 0 24 24"><path d="M10.6 9.2 5.4 4 4 5.4l5.2 5.2 1.4-1.4ZM14.5 4l2 2L4 18.6 5.4 20 18 7.5l2 2V4h-5.5Zm.3 9.4-1.4 1.4 3.1 3.1-2 2.1H20v-5.5l-2 2-3.2-3.1Z"/></svg></button>
+        <button id="prevBtn" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+        <button id="playBtn" title="Play/Pause"><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+        <button id="nextBtn" title="Next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+      </div>
+      <div class="volume">
+        <button id="volDown">−</button>
+        <div id="volLabel">Vol –</div>
+        <button id="volUp">+</button>
+      </div>
+    </section>
+
+    <section id="lists">
+      <h2>Your playlists</h2>
+      <div id="grid"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= SETUP / LOGIN ================= -->
+<div id="setup" class="hidden">
+  <div class="card">
+    <h1>Kitchen Remote</h1>
+    <div id="needId">
+      <p>Paste your Spotify app's <b>Client ID</b> (from developer.spotify.com → your app → Settings).</p>
+      <input id="idInput" placeholder="Client ID" autocomplete="off" spellcheck="false">
+    </div>
+    <p>In your Spotify app settings, the <b>Redirect URI</b> must be exactly:<br><code id="redirectShow"></code></p>
+    <button class="big" id="loginBtn">Log in with Spotify</button>
+  </div>
+</div>
+
+<!-- ================= SPEAKER PICKER ================= -->
+<div id="sheet" class="hidden">
+  <div class="card">
+    <h1>Choose a speaker</h1>
+    <p>Tap your Echo to play there. It becomes the default for playlists.<br>
+       Echo not listed? Say <i>"Alexa, Spotify Connect"</i> and tap Refresh.</p>
+    <div id="devList"></div>
+    <div style="display:flex; gap:10px; margin-top:6px">
+      <button class="big" id="refreshDevs">Refresh</button>
+      <button id="closeSheet" style="padding:16px 26px; font-size:20px">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script>
+/* =====================================================================
+   SETTINGS — put your Spotify Client ID between the quotes.
+   (Or leave blank and paste it into the setup screen instead.)
+   ===================================================================== */
+const CLIENT_ID = "";
+
+const SCOPES = [
+  "user-read-playback-state",
+  "user-modify-playback-state",
+  "user-read-currently-playing",
+  "playlist-read-private",
+  "playlist-read-collaborative"
+].join(" ");
+const REDIRECT_URI = location.origin + location.pathname;  // this page's own address
+const POLL_MS = 5000;   // how often to ask Spotify "what's playing?"
+
+/* ---------- tiny helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+let toastTimer;
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = isErr ? "err" : "";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = "hidden", 4000);
+}
+function clientId() { return CLIENT_ID || store.get("clientId") || ""; }
+
+/* =====================================================================
+   1. LOGIN (OAuth "Authorization Code with PKCE")
+   No password or secret is stored in this page. Spotify gives us a
+   short-lived access token (1 hour) plus a refresh token to get new ones.
+   ===================================================================== */
+function randomString(len) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const vals = crypto.getRandomValues(new Uint8Array(len));
+  return Array.from(vals, (v) => chars[v % chars.length]).join("");
+}
+async function sha256base64url(text) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function startLogin() {
+  if (!CLIENT_ID) {
+    const typed = $("idInput").value.trim();
+    if (typed) store.set("clientId", typed);
+  }
+  if (!clientId()) { toast("Enter your Client ID first", true); return; }
+  const verifier = randomString(64);
+  store.set("pkceVerifier", verifier);
+  const params = new URLSearchParams({
+    client_id: clientId(),
+    response_type: "code",
+    redirect_uri: REDIRECT_URI,
+    code_challenge_method: "S256",
+    code_challenge: await sha256base64url(verifier),
+    scope: SCOPES
+  });
+  location.href = "https://accounts.spotify.com/authorize?" + params;
+}
+async function tokenRequest(body) {
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(body)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.error || "Login failed");
+  store.set("accessToken", data.access_token);
+  store.set("expiresAt", String(Date.now() + (data.expires_in - 60) * 1000));
+  if (data.refresh_token) store.set("refreshToken", data.refresh_token);
+}
+async function finishLoginIfReturning() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("error")) { toast("Spotify said: " + q.get("error"), true); }
+  if (!q.get("code")) return;
+  history.replaceState(null, "", REDIRECT_URI);   // tidy the address bar
+  await tokenRequest({
+    grant_type: "authorization_code",
+    code: q.get("code"),
+    redirect_uri: REDIRECT_URI,
+    client_id: clientId(),
+    code_verifier: store.get("pkceVerifier") || ""
+  });
+  store.del("pkceVerifier");
+}
+async function getToken() {
+  if (Number(store.get("expiresAt") || 0) > Date.now()) return store.get("accessToken");
+  const rt = store.get("refreshToken");
+  if (!rt) return null;
+  await tokenRequest({ grant_type: "refresh_token", refresh_token: rt, client_id: clientId() });
+  return store.get("accessToken");
+}
+function logout() {
+  ["accessToken", "refreshToken", "expiresAt"].forEach(store.del);
+  location.reload();
+}
+
+/* =====================================================================
+   2. TALKING TO SPOTIFY (Web API)
+   ===================================================================== */
+async function api(method, path, body) {
+  let token;
+  try { token = await getToken(); } catch (e) { logout(); return null; }
+  if (!token) { showSetup(); return null; }
+  const res = await fetch("https://api.spotify.com/v1" + path, {
+    method,
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 204 || res.status === 202) return null;   // "OK, nothing to say"
+  if (res.status === 401) { store.del("expiresAt"); return api(method, path, body); }
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    const msg = (data && data.error && data.error.message) || ("Error " + res.status);
+    const err = new Error(msg); err.status = res.status; err.reason = data && data.error && data.error.reason;
+    throw err;
+  }
+  return data;
+}
+
+/* =====================================================================
+   3. STATE + SCREEN UPDATES
+   ===================================================================== */
+let player = null;      // last /me/player response
+let devices = [];
+
+function preferredDevice() {
+  const name = store.get("preferredDevice");
+  return devices.find((d) => d.name === name) || null;
+}
+function targetDeviceId() {
+  const pref = preferredDevice();
+  if (pref) return pref.id;
+  return player && player.device ? player.device.id : null;
+}
+
+async function refreshPlayer() {
+  try {
+    player = await api("GET", "/me/player");
+  } catch (e) { return; }
+  render();
+}
+async function refreshDevices() {
+  try {
+    const d = await api("GET", "/me/player/devices");
+    devices = (d && d.devices) || [];
+  } catch (e) { devices = []; }
+}
+
+function render() {
+  const item = player && player.item;
+  const dev = player && player.device;
+  const pref = store.get("preferredDevice");
+
+  $("deviceName").textContent = dev ? dev.name : (pref ? pref + " (idle)" : "Choose speaker");
+  $("deviceBtn").classList.toggle("ok", !!dev);
+
+  if (item) {
+    $("track").textContent = item.name;
+    $("artist").textContent = (item.artists || item.show && [item.show] || []).map((a) => a.name).join(", ");
+    const imgs = (item.album && item.album.images) || item.images || [];
+    $("art").style.backgroundImage = imgs.length ? "url('" + imgs[0].url + "')" : "";
+    const pct = item.duration_ms ? (player.progress_ms / item.duration_ms) * 100 : 0;
+    $("progressBar").style.width = pct + "%";
+  } else {
+    $("track").textContent = "Nothing playing";
+    $("artist").textContent = "Pick a playlist to start";
+    $("art").style.backgroundImage = "";
+    $("progressBar").style.width = "0";
+  }
+
+  const playing = !!(player && player.is_playing);
+  $("playIcon").innerHTML = playing
+    ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>'
+    : '<path d="M8 5v14l11-7z"/>';
+  $("shuffleBtn").classList.toggle("on", !!(player && player.shuffle_state));
+  $("volLabel").textContent = dev && dev.volume_percent != null ? "Vol " + dev.volume_percent : "Vol –";
+}
+
+/* =====================================================================
+   4. BUTTON ACTIONS
+   ===================================================================== */
+async function act(fn) {
+  try { await fn(); }
+  catch (e) {
+    if (e.reason === "NO_ACTIVE_DEVICE" || e.status === 404) {
+      toast("No speaker active — tap the speaker button to choose your Echo", true);
+    } else if (e.status === 403) {
+      toast("Spotify refused that (Premium needed, or not allowed on this speaker)", true);
+    } else { toast(e.message, true); }
+  }
+  setTimeout(refreshPlayer, 700);
+}
+function q(path) {  // add ?device_id= when we know which speaker to use
+  const id = targetDeviceId();
+  return id ? path + (path.includes("?") ? "&" : "?") + "device_id=" + encodeURIComponent(id) : path;
+}
+
+$("playBtn").onclick = () => act(() =>
+  player && player.is_playing ? api("PUT", q("/me/player/pause")) : api("PUT", q("/me/player/play")));
+$("nextBtn").onclick = () => act(() => api("POST", q("/me/player/next")));
+$("prevBtn").onclick = () => act(() => api("POST", q("/me/player/previous")));
+$("shuffleBtn").onclick = () => act(() =>
+  api("PUT", q("/me/player/shuffle?state=" + !(player && player.shuffle_state))));
+
+function changeVolume(step) {
+  const now = player && player.device && player.device.volume_percent;
+  if (now == null) { toast("Volume unknown — start something playing first", true); return; }
+  const v = Math.max(0, Math.min(100, now + step));
+  player.device.volume_percent = v; render();          // update screen straight away
+  act(() => api("PUT", q("/me/player/volume?volume_percent=" + v)));
+}
+$("volUp").onclick = () => changeVolume(10);
+$("volDown").onclick = () => changeVolume(-10);
+
+async function playPlaylist(uri) {
+  await refreshDevices();
+  const id = targetDeviceId();
+  if (!id) { toast("Choose your Echo first", true); openSheet(); return; }
+  act(() => api("PUT", "/me/player/play?device_id=" + encodeURIComponent(id), { context_uri: uri }));
+}
+
+/* ---------- playlists ---------- */
+async function loadPlaylists() {
+  let data;
+  try { data = await api("GET", "/me/playlists?limit=50"); } catch (e) { toast(e.message, true); return; }
+  const grid = $("grid");
+  grid.innerHTML = "";
+  ((data && data.items) || []).filter(Boolean).forEach((pl) => {
+    const b = document.createElement("button");
+    b.className = "pl";
+    const img = document.createElement("div");
+    img.className = "img";
+    if (pl.images && pl.images.length) img.style.backgroundImage = "url('" + pl.images[0].url + "')";
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = pl.name;
+    b.append(img, name);
+    b.onclick = () => playPlaylist(pl.uri);
+    grid.append(b);
+  });
+  if (!grid.children.length) grid.innerHTML = '<p style="color:var(--muted)">No playlists found.</p>';
+}
+
+/* ---------- speaker picker ---------- */
+async function openSheet() {
+  $("sheet").classList.remove("hidden");
+  $("devList").innerHTML = '<p>Looking for speakers…</p>';
+  await refreshDevices();
+  const list = $("devList");
+  list.innerHTML = "";
+  if (!devices.length) list.innerHTML = '<p>No speakers found. Say "Alexa, Spotify Connect", then Refresh.</p>';
+  const pref = store.get("preferredDevice");
+  devices.forEach((d) => {
+    const b = document.createElement("button");
+    b.className = "dev" + (d.is_active ? " active" : "");
+    b.innerHTML = "<span></span><small></small>" + (d.name === pref ? '<span class="star">DEFAULT</span>' : "");
+    b.children[0].textContent = d.name;
+    b.children[1].textContent = d.type;
+    b.onclick = () => {
+      store.set("preferredDevice", d.name);
+      $("sheet").classList.add("hidden");
+      act(() => api("PUT", "/me/player", { device_ids: [d.id], play: !!(player && player.is_playing) }));
+      toast("Playing on " + d.name);
+    };
+    list.append(b);
+  });
+}
+$("deviceBtn").onclick = openSheet;
+$("refreshDevs").onclick = openSheet;
+$("closeSheet").onclick = () => $("sheet").classList.add("hidden");
+// Long-press the clock for 3 seconds to log out (handy if it ever gets stuck)
+let pressTimer;
+$("clock").addEventListener("touchstart", () => { pressTimer = setTimeout(logout, 3000); });
+$("clock").addEventListener("touchend", () => clearTimeout(pressTimer));
+
+/* =====================================================================
+   5. CLOCK + START-UP
+   ===================================================================== */
+function tickClock() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  $("date").textContent = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+}
+function showSetup() {
+  $("app").classList.add("hidden");
+  $("setup").classList.remove("hidden");
+  $("needId").classList.toggle("hidden", !!CLIENT_ID);
+  if (!CLIENT_ID && store.get("clientId")) $("idInput").value = store.get("clientId");
+  $("redirectShow").textContent = REDIRECT_URI;
+}
+$("loginBtn").onclick = startLogin;
+
+(async function start() {
+  tickClock(); setInterval(tickClock, 10000);
+  try { await finishLoginIfReturning(); } catch (e) { toast(e.message, true); }
+  let token = null;
+  try { token = await getToken(); } catch (e) { toast(e.message, true); }
+  if (!token) { showSetup(); return; }
+  $("setup").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  await refreshDevices();
+  await refreshPlayer();
+  loadPlaylists();
+  setInterval(refreshPlayer, POLL_MS);
+})();
+</script>
+</body>
+</html>
